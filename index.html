@@ -49,13 +49,18 @@
 
     // Firebase listeners - CẢI THIỆN: Đảm bảo data được load đầy đủ
     db.ref('nicknamePool').on('value', (snap) => {
+      console.log('🔥 Firebase nicknamePool updated');
       state.nicknamePool = [];
       if (snap.exists()) {
         snap.forEach(child => {
           state.nicknamePool.push({ id: child.key, ...child.val() });
         });
+        console.log('📦 Loaded nicknames:', state.nicknamePool.length);
+      } else {
+        console.log('⚠️ No nicknames in database');
       }
       state.dataLoaded = true;
+      console.log('✅ Data loaded, rendering...');
       render();
     });
 
@@ -108,16 +113,42 @@
     }
 
     function renderCheckin() {
+      console.log('🎨 Rendering checkin page');
+      console.log('📊 dataLoaded:', state.dataLoaded);
+      console.log('📦 nicknamePool length:', state.nicknamePool.length);
+      
       // Hiển thị loading nếu data chưa sẵn sàng
       if (!state.dataLoaded) {
         return `
           <div class="min-h-screen bg-gradient-to-br from-green-500 via-teal-500 to-blue-500 p-8 flex items-center justify-center">
-            <div class="text-white text-2xl">Đang tải dữ liệu...</div>
+            <div class="text-center">
+              <div class="text-white text-3xl mb-4">Đang tải dữ liệu...</div>
+              <div class="text-white text-sm opacity-75">Vui lòng đợi trong giây lát</div>
+            </div>
           </div>
         `;
       }
 
       const availableCount = state.nicknamePool.filter(n => !n.used).length;
+      
+      // Nếu chưa có biệt danh nào trong database
+      if (state.nicknamePool.length === 0) {
+        return `
+          <div class="min-h-screen bg-gradient-to-br from-green-500 via-teal-500 to-blue-500 p-8 flex items-center justify-center">
+            <div class="max-w-2xl mx-auto">
+              <div class="bg-white rounded-3xl shadow-2xl p-12 text-center">
+                <div class="text-6xl mb-4">⚠️</div>
+                <h1 class="text-3xl font-bold text-orange-600 mb-4">Chưa có biệt danh!</h1>
+                <p class="text-gray-600 text-lg mb-6">Ban tổ chức chưa thêm biệt danh vào hệ thống.</p>
+                <p class="text-gray-500 mb-8">Vui lòng liên hệ BTC hoặc quay lại sau.</p>
+                <button id="backBtnEmpty" class="bg-gradient-to-r from-teal-500 to-blue-500 text-white px-8 py-4 rounded-xl font-bold text-xl hover:from-teal-600 hover:to-blue-600 transition-all">
+                  ← Quay về trang chủ
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
 
       return `
         <div class="min-h-screen bg-gradient-to-br from-green-500 via-teal-500 to-blue-500 p-8">
@@ -128,7 +159,7 @@
                 <div class="text-6xl mb-4">🎊</div>
                 <h1 class="text-4xl font-bold text-teal-600 mb-2">Chào mừng bạn!</h1>
                 <p class="text-gray-600 text-lg">Nhập tên để nhận biệt danh bí ẩn</p>
-                <p class="text-sm text-gray-500 mt-2">Còn ${availableCount} biệt danh</p>
+                <p class="text-sm text-gray-500 mt-2">Còn <span class="font-bold text-teal-600">${availableCount}</span> biệt danh</p>
               </div>
               <div class="mb-8">
                 <input type="text" id="inputName" placeholder="Nhập họ tên của bạn" 
@@ -527,14 +558,20 @@
           app.innerHTML = renderCheckin();
           // Attach event listeners sau khi render
           const backBtn = document.getElementById('backBtn');
+          const backBtnEmpty = document.getElementById('backBtnEmpty');
           const checkinBtn = document.getElementById('checkinBtn');
           const inputName = document.getElementById('inputName');
           
           if (backBtn) backBtn.addEventListener('click', () => setView('home'));
+          if (backBtnEmpty) backBtnEmpty.addEventListener('click', () => setView('home'));
           if (checkinBtn) checkinBtn.addEventListener('click', handleCheckin);
-          if (inputName) inputName.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleCheckin();
-          });
+          if (inputName) {
+            inputName.addEventListener('keypress', (e) => {
+              if (e.key === 'Enter') handleCheckin();
+            });
+            // Auto focus vào input
+            inputName.focus();
+          }
           break;
         case 'admin-login': app.innerHTML = renderAdminLogin(); break;
         case 'admin':
