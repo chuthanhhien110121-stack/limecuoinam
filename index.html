@@ -41,12 +41,13 @@
       drawnParticipants: [],
       isAdminAuthenticated: false,
       currentWinner: null,
-      isSpinning: false
+      isSpinning: false,
+      dataLoaded: false
     };
 
     const ADMIN_PASSWORD = 'yearend2024';
 
-    // Firebase listeners
+    // Firebase listeners - CẢI THIỆN: Đảm bảo data được load đầy đủ
     db.ref('nicknamePool').on('value', (snap) => {
       state.nicknamePool = [];
       if (snap.exists()) {
@@ -54,7 +55,8 @@
           state.nicknamePool.push({ id: child.key, ...child.val() });
         });
       }
-      if (state.view === 'admin') render();
+      state.dataLoaded = true;
+      render();
     });
 
     db.ref('participants').on('value', (snap) => {
@@ -64,7 +66,7 @@
           state.participants.push({ id: child.key, ...child.val() });
         });
       }
-      if (state.view === 'admin') render();
+      render();
     });
 
     db.ref('drawnParticipants').on('value', (snap) => {
@@ -74,7 +76,7 @@
           state.drawnParticipants.push({ id: child.key, ...child.val() });
         });
       }
-      if (state.view === 'admin') render();
+      render();
     });
 
     function renderHome() {
@@ -106,6 +108,17 @@
     }
 
     function renderCheckin() {
+      // Hiển thị loading nếu data chưa sẵn sàng
+      if (!state.dataLoaded) {
+        return `
+          <div class="min-h-screen bg-gradient-to-br from-green-500 via-teal-500 to-blue-500 p-8 flex items-center justify-center">
+            <div class="text-white text-2xl">Đang tải dữ liệu...</div>
+          </div>
+        `;
+      }
+
+      const availableCount = state.nicknamePool.filter(n => !n.used).length;
+
       return `
         <div class="min-h-screen bg-gradient-to-br from-green-500 via-teal-500 to-blue-500 p-8">
           <div class="max-w-2xl mx-auto">
@@ -115,6 +128,7 @@
                 <div class="text-6xl mb-4">🎊</div>
                 <h1 class="text-4xl font-bold text-teal-600 mb-2">Chào mừng bạn!</h1>
                 <p class="text-gray-600 text-lg">Nhập tên để nhận biệt danh bí ẩn</p>
+                <p class="text-sm text-gray-500 mt-2">Còn ${availableCount} biệt danh</p>
               </div>
               <div class="mb-8">
                 <input type="text" id="inputName" placeholder="Nhập họ tên của bạn" 
@@ -315,8 +329,20 @@
         alert('Vui lòng nhập tên của bạn!');
         return;
       }
+
+      // FIXED: Kiểm tra data đã load chưa
+      if (!state.dataLoaded) {
+        alert('Hệ thống đang tải dữ liệu, vui lòng đợi chút...');
+        return;
+      }
       
-      const available = state.nicknamePool.filter(n => !n.used);
+      // FIXED: Filter chính xác các biệt danh chưa dùng
+      const available = state.nicknamePool.filter(n => n.used === false || n.used === undefined || !n.used);
+      
+      console.log('Tổng biệt danh:', state.nicknamePool.length);
+      console.log('Biệt danh còn lại:', available.length);
+      console.log('Danh sách available:', available);
+      
       if (available.length === 0) {
         alert('Đã hết biệt danh! Vui lòng liên hệ ban tổ chức.');
         return;
@@ -325,6 +351,7 @@
       const random = available[Math.floor(Math.random() * available.length)];
       
       try {
+        // Lưu participant trước
         await db.ref('participants').push({
           name: name,
           nickname: random.text,
@@ -332,11 +359,13 @@
           hasWon: false
         });
 
+        // Đánh dấu biệt danh đã dùng
         await db.ref('nicknamePool/' + random.id).update({ used: true });
+        
         showNicknamePopup(random.text);
         input.value = '';
       } catch (err) {
-        console.error(err);
+        console.error('Lỗi check-in:', err);
         alert('Có lỗi xảy ra! Vui lòng thử lại.');
       }
     }
@@ -361,7 +390,13 @@
 
     async function addNicknames() {
       const input = document.getElementById('nicknameInput');
-      const lines = input.value.split('\n').map(l => l.trim()).filter(Boolean);
+      const text = input.value;
+      
+      // FIXED: Split bằng cả \n và \r\n để hỗ trợ mọi định dạng xuống dòng
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+      console.log('Raw text:', text);
+      console.log('Lines detected:', lines);
 
       if (lines.length === 0) {
         alert('Vui lòng nhập ít nhất 1 biệt danh!');
@@ -369,13 +404,17 @@
       }
 
       try {
-        for (const text of lines) {
-          await db.ref('nicknamePool').push({ text: text, used: false });
-        }
+        // Sử dụng Promise.all để thêm đồng thời nhiều biệt danh
+        const promises = lines.map(text => 
+          db.ref('nicknamePool').push({ text: text, used: false })
+        );
+        
+        await Promise.all(promises);
+        
         input.value = '';
         alert(`✅ Đã thêm ${lines.length} biệt danh!`);
       } catch (err) {
-        console.error(err);
+        console.error('Lỗi thêm biệt danh:', err);
         alert('Có lỗi! Vui lòng thử lại.');
       }
     }
