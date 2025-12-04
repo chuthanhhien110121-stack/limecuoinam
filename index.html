@@ -5,9 +5,488 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Year End Party 2024</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  <style>
+    @keyframes bounce-in {
+      0% { transform: scale(0.3); opacity: 0; }
+      50% { transform: scale(1.05); }
+      70% { transform: scale(0.9); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .animate-bounce-in { animation: bounce-in 0.5s ease-out; }
+  </style>
 </head>
-<body>
-  <div id="root"></div>
-  <script type="module" src="./app.js"></script>
+<body class="m-0 p-0">
+  <div id="app"></div>
+
+  <script>
+    // ===============================================
+    // 🔥 FIREBASE CONFIG - THAY ĐỔI THÔNG TIN NÀY
+    // ===============================================
+    const // Import the functions you need from the SDKs you need import { initializeApp } from "firebase/app"; import { getAnalytics } from "firebase/analytics"; // TODO: Add SDKs for Firebase products that you want to use // https://firebase.google.com/docs/web/setup#available-libraries  // Your web app's Firebase configuration // For Firebase JS SDK v7.20.0 and later, measurementId is optional const firebaseConfig = {   apiKey: "AIzaSyDdzEbdm4xnnqZ4jxekn_5s2A90fCuDZfk",   authDomain: "year-end-party-d4dff.firebaseapp.com",   projectId: "year-end-party-d4dff",   storageBucket: "year-end-party-d4dff.firebasestorage.app",   messagingSenderId: "866293512188",   appId: "1:866293512188:web:65754bd03de5910021e479",   measurementId: "G-CJM3MTSSC2" };  // Initialize Firebase const app = initializeApp(firebaseConfig); const analytics = getAnalytics(app); = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.appspot.com",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(// Import the functions you need from the SDKs you need import { initializeApp } from "firebase/app"; import { getAnalytics } from "firebase/analytics"; // TODO: Add SDKs for Firebase products that you want to use // https://firebase.google.com/docs/web/setup#available-libraries  // Your web app's Firebase configuration // For Firebase JS SDK v7.20.0 and later, measurementId is optional const firebaseConfig = {   apiKey: "AIzaSyDdzEbdm4xnnqZ4jxekn_5s2A90fCuDZfk",   authDomain: "year-end-party-d4dff.firebaseapp.com",   projectId: "year-end-party-d4dff",   storageBucket: "year-end-party-d4dff.firebasestorage.app",   messagingSenderId: "866293512188",   appId: "1:866293512188:web:65754bd03de5910021e479",   measurementId: "G-CJM3MTSSC2" };  // Initialize Firebase const app = initializeApp(firebaseConfig); const analytics = getAnalytics(app););
+    const database = firebase.database();
+
+    // State management
+    let state = {
+      view: 'home',
+      nicknamePool: [],
+      participants: [],
+      drawnParticipants: [],
+      isAdminAuthenticated: false,
+      currentWinner: null,
+      isSpinning: false
+    };
+
+    const ADMIN_PASSWORD = 'yearend2024';
+
+    // Firebase listeners
+    function initFirebaseListeners() {
+      database.ref('nicknamePool').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          state.nicknamePool = Object.values(data);
+          if (state.view === 'admin') render();
+        }
+      });
+
+      database.ref('participants').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          state.participants = Object.values(data);
+          if (state.view === 'admin') render();
+        }
+      });
+
+      database.ref('drawnParticipants').on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          state.drawnParticipants = Object.values(data);
+          if (state.view === 'admin') render();
+        }
+      });
+    }
+
+    // Render functions
+    function renderHome() {
+      return `
+        <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 p-8 flex items-center justify-center">
+          <div class="max-w-4xl w-full">
+            <div class="text-center mb-12">
+              <div class="text-8xl mb-6">🎉</div>
+              <h1 class="text-6xl font-bold text-white mb-4 drop-shadow-lg">Year End Party 2024</h1>
+              <p class="text-2xl text-white opacity-90">Chào mừng đến với bữa tiệc cuối năm!</p>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+              <button onclick="setView('checkin')" class="bg-white rounded-3xl p-12 shadow-2xl hover:shadow-3xl transition-all transform hover:scale-105 group">
+                <div class="text-7xl mb-6 group-hover:scale-110 transition-transform">🎊</div>
+                <h2 class="text-3xl font-bold text-teal-600 mb-3">Check-in</h2>
+                <p class="text-gray-600 text-lg">Nhập tên để nhận biệt danh của bạn</p>
+                <div class="mt-6 bg-teal-100 text-teal-700 px-6 py-3 rounded-xl font-semibold">
+                  Dành cho khách mời →
+                </div>
+              </button>
+              <button onclick="setView('admin-login')" class="bg-white rounded-3xl p-12 shadow-2xl hover:shadow-3xl transition-all transform hover:scale-105 group">
+                <div class="text-7xl mb-6 group-hover:scale-110 transition-transform">👑</div>
+                <h2 class="text-3xl font-bold text-purple-600 mb-3">Admin</h2>
+                <p class="text-gray-600 text-lg">Quản lý & quay số trúng thưởng</p>
+                <div class="mt-6 bg-purple-100 text-purple-700 px-6 py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
+                  🔒 Dành cho BTC →
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCheckin() {
+      return `
+        <div class="min-h-screen bg-gradient-to-br from-green-500 via-teal-500 to-blue-500 p-8">
+          <div class="max-w-2xl mx-auto">
+            <div class="bg-white rounded-3xl shadow-2xl p-12 relative">
+              <button onclick="setView('home')" class="absolute top-6 left-6 text-gray-500 hover:text-gray-700 text-2xl">
+                ← Quay lại
+              </button>
+              <div class="text-center mb-8 mt-8">
+                <div class="text-6xl mb-4">🎊</div>
+                <h1 class="text-4xl font-bold text-teal-600 mb-2">Chào mừng bạn!</h1>
+                <p class="text-gray-600 text-lg">Nhập tên để nhận biệt danh bí ẩn</p>
+              </div>
+              <div class="mb-8">
+                <input type="text" id="inputName" placeholder="Nhập họ tên của bạn" 
+                  class="w-full px-6 py-5 text-xl border-4 border-teal-300 rounded-2xl focus:outline-none focus:border-teal-500 text-center font-semibold"
+                  onkeypress="if(event.key==='Enter') handleCheckin()">
+              </div>
+              <button onclick="handleCheckin()" 
+                class="w-full bg-gradient-to-r from-teal-500 to-blue-500 text-white py-6 rounded-2xl font-bold text-2xl hover:from-teal-600 hover:to-blue-600 transition-all shadow-lg">
+                ✨ Nhận biệt danh ngay!
+              </button>
+              <div class="mt-8 text-center text-gray-500">
+                <p class="text-sm">💡 Hãy nhớ biệt danh của bạn để tham gia các hoạt động!</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderAdminLogin() {
+      return `
+        <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-500 p-8 flex items-center justify-center">
+          <div class="max-w-md w-full">
+            <div class="bg-white rounded-3xl shadow-2xl p-12 relative">
+              <button onclick="setView('home')" class="absolute top-6 left-6 text-gray-500 hover:text-gray-700 text-2xl">
+                ← Quay lại
+              </button>
+              <div class="text-center mb-8 mt-8">
+                <div class="text-7xl mb-4">🔒</div>
+                <h1 class="text-4xl font-bold text-purple-600 mb-2">Đăng nhập Admin</h1>
+                <p class="text-gray-600 text-lg">Chỉ dành cho Ban Tổ Chức</p>
+              </div>
+              <div class="mb-8">
+                <input type="password" id="adminPassword" placeholder="Nhập mật khẩu"
+                  class="w-full px-6 py-5 text-xl border-4 border-purple-300 rounded-2xl focus:outline-none focus:border-purple-500 text-center font-semibold"
+                  onkeypress="if(event.key==='Enter') handleAdminLogin()">
+              </div>
+              <button onclick="handleAdminLogin()"
+                class="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-6 rounded-2xl font-bold text-2xl hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg">
+                🔓 Đăng nhập
+              </button>
+              <div class="mt-6 text-center text-sm text-gray-500">
+                💡 Mật khẩu mặc định: yearend2024
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderAdmin() {
+      const sortedParticipants = [...state.participants].sort((a, b) => 
+        new Date(a.timestamp) - new Date(b.timestamp)
+      );
+      const eligibleCount = state.participants.filter(p => !p.hasWon).length;
+
+      return `
+        <div class="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-500 p-8">
+          <div class="max-w-7xl mx-auto">
+            <div class="bg-white rounded-3xl shadow-2xl p-8">
+              <div class="flex justify-between items-center mb-8 flex-wrap gap-4">
+                <div class="flex items-center gap-4">
+                  <button onclick="setView('home')" class="text-gray-500 hover:text-gray-700 text-2xl">← Quay lại</button>
+                  <div>
+                    <h1 class="text-4xl font-bold text-purple-600 mb-1">👑 Trang Quản Trị</h1>
+                    <p class="text-gray-600">Quản lý biệt danh & quay thưởng</p>
+                  </div>
+                </div>
+                <div class="flex gap-3 flex-wrap">
+                  <button onclick="exportReport()" class="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-all">📥 Xuất báo cáo</button>
+                  <button onclick="resetSystem()" class="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-all">🔄 Reset</button>
+                  <button onclick="handleLogout()" class="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition-all">🔒 Đăng xuất</button>
+                </div>
+              </div>
+
+              <div class="bg-gradient-to-r from-blue-100 to-indigo-100 rounded-2xl p-6 mb-8">
+                <h2 class="text-2xl font-bold text-indigo-700 mb-4">⚙️ Quản lý Kho Biệt Danh</h2>
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                  <div class="bg-white rounded-xl p-4 text-center">
+                    <div class="text-4xl font-bold text-indigo-600">${state.nicknamePool.length}</div>
+                    <div class="text-sm text-gray-600 mt-1">Tổng cộng</div>
+                  </div>
+                  <div class="bg-white rounded-xl p-4 text-center">
+                    <div class="text-4xl font-bold text-green-600">${state.nicknamePool.filter(n => !n.used).length}</div>
+                    <div class="text-sm text-gray-600 mt-1">Còn lại</div>
+                  </div>
+                  <div class="bg-white rounded-xl p-4 text-center">
+                    <div class="text-4xl font-bold text-gray-600">${state.nicknamePool.filter(n => n.used).length}</div>
+                    <div class="text-sm text-gray-600 mt-1">Đã dùng</div>
+                  </div>
+                </div>
+                <div class="bg-white rounded-xl p-4 mb-4">
+                  <textarea id="nicknameInput" placeholder="Nhập danh sách biệt danh (mỗi dòng 1 biệt danh)&#10;Ví dụ:&#10;Siêu nhân Marketing&#10;Flash của phòng IT&#10;Cà phê đen"
+                    class="w-full h-32 px-4 py-3 border-2 border-indigo-300 rounded-lg focus:outline-none focus:border-indigo-500"></textarea>
+                  <button onclick="addNicknames()" class="w-full mt-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white py-3 rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all font-bold">➕ Thêm vào kho</button>
+                </div>
+                <div class="space-y-2 max-h-60 overflow-y-auto">
+                  ${state.nicknamePool.map(n => `
+                    <div class="rounded-lg p-3 flex justify-between items-center ${n.used ? 'bg-gray-100 opacity-60' : 'bg-white'}">
+                      <span class="font-medium ${n.used ? 'line-through text-gray-500' : 'text-gray-800'}">${n.text}</span>
+                      <div class="flex items-center gap-2">
+                        ${n.used ? '<span class="text-xs bg-red-500 text-white px-2 py-1 rounded">Đã dùng</span>' : ''}
+                        <button onclick="removeNickname('${n.id}')" class="text-red-500 hover:bg-red-50 px-2 py-1 rounded text-sm">✕</button>
+                      </div>
+                    </div>
+                  `).join('') || '<div class="text-center py-8 text-gray-400">Chưa có biệt danh nào. Thêm biệt danh để bắt đầu!</div>'}
+                </div>
+              </div>
+
+              <div class="bg-gradient-to-br from-yellow-100 to-orange-100 rounded-2xl p-8 mb-8 border-4 border-yellow-300">
+                <h2 class="text-3xl font-bold text-orange-600 mb-6 text-center">🏆 Quay Số Trúng Thưởng</h2>
+                <div class="text-center mb-6">
+                  <p class="text-xl text-gray-700">Còn <span class="font-bold text-orange-600">${eligibleCount}</span> người chưa quay</p>
+                </div>
+                ${state.currentWinner ? `
+                  <div class="bg-white rounded-xl p-8 mb-6 text-center border-4 border-yellow-400">
+                    <div class="text-6xl mb-4">🎉</div>
+                    <h3 class="text-2xl text-gray-600 mb-2">Biệt danh: "${state.currentWinner.nickname}"</h3>
+                    <h3 class="text-4xl font-bold text-purple-600 mb-2">${state.currentWinner.name}</h3>
+                    ${!state.isSpinning ? '<div class="mt-4"><span class="bg-green-500 text-white px-6 py-2 rounded-full font-bold text-lg">🎊 Chúc mừng! 🎊</span></div>' : ''}
+                  </div>
+                ` : ''}
+                <button onclick="spinLuckyDraw()" ${eligibleCount === 0 ? 'disabled' : ''}
+                  class="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-6 rounded-xl font-bold text-2xl hover:from-orange-600 hover:to-red-600 transition-all disabled:opacity-50">
+                  🎁 ${state.isSpinning ? 'Đang quay...' : 'Quay thưởng ngay!'}
+                </button>
+              </div>
+
+              ${state.drawnParticipants.length > 0 ? `
+                <div class="bg-gradient-to-r from-green-100 to-emerald-100 rounded-xl p-6 mb-6">
+                  <h3 class="text-xl font-bold text-green-700 mb-4">🎖️ Danh sách người trúng thưởng (${state.drawnParticipants.length})</h3>
+                  <div class="space-y-2 max-h-60 overflow-y-auto">
+                    ${state.drawnParticipants.map((p, i) => `
+                      <div class="bg-white rounded-lg p-4 flex justify-between items-center">
+                        <div>
+                          <span class="font-bold text-green-600">#${i + 1}</span>
+                          <span class="ml-3 text-purple-600">"${p.nickname}"</span>
+                          <span class="mx-2 text-gray-400">→</span>
+                          <span class="font-semibold text-gray-800">${p.name}</span>
+                        </div>
+                        <span class="text-sm text-gray-500">${new Date(p.wonAt).toLocaleTimeString('vi-VN')}</span>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
+
+              <div class="bg-gray-50 rounded-xl p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">⏰ Thống kê Check-in theo thời gian (${state.participants.length} người)</h3>
+                <div class="space-y-2 max-h-96 overflow-y-auto">
+                  ${sortedParticipants.map((p, i) => `
+                    <div class="rounded-lg p-4 flex justify-between items-center ${p.hasWon ? 'bg-green-50 border-2 border-green-300' : 'bg-white'}">
+                      <div class="flex items-center gap-4 flex-1">
+                        <span class="font-bold text-gray-500 w-10">#${i + 1}</span>
+                        <div class="flex-1">
+                          <div class="text-sm text-gray-500">⏰ ${new Date(p.timestamp).toLocaleTimeString('vi-VN')}</div>
+                          <div class="mt-1">
+                            <span class="text-purple-600 font-medium">"${p.nickname}"</span>
+                            <span class="mx-2 text-gray-400">→</span>
+                            <span class="font-semibold text-gray-800">${p.name}</span>
+                          </div>
+                        </div>
+                      </div>
+                      ${p.hasWon ? '<span class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-bold ml-4">✓ Đã trúng</span>' : ''}
+                    </div>
+                  `).join('') || '<div class="text-center py-8 text-gray-400">Chưa có ai check-in</div>'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function showNicknamePopup(nickname) {
+      const popup = document.createElement('div');
+      popup.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+      popup.innerHTML = `
+        <div class="bg-white rounded-3xl p-12 max-w-lg w-full text-center shadow-2xl animate-bounce-in">
+          <div class="text-7xl mb-6">🎭</div>
+          <h2 class="text-3xl font-bold text-purple-600 mb-4">Biệt danh của bạn là:</h2>
+          <div class="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-2xl p-8 mb-6 border-4 border-yellow-300">
+            <p class="text-5xl font-bold text-orange-600">"${nickname}"</p>
+          </div>
+          <p class="text-xl text-gray-700 mb-8">📌 Hãy ghi nhớ biệt danh này nhé!</p>
+          <button onclick="this.parentElement.parentElement.remove()"
+            class="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-10 py-4 rounded-xl font-bold text-xl hover:from-green-600 hover:to-emerald-600 transition-all">
+            Đã nhớ rồi! ✓
+          </button>
+        </div>
+      `;
+      document.body.appendChild(popup);
+    }
+
+    // Action handlers
+    function setView(view) {
+      state.view = view;
+      render();
+    }
+
+    async function handleCheckin() {
+      const input = document.getElementById('inputName');
+      const name = input.value.trim();
+      
+      if (!name) return;
+      
+      const available = state.nicknamePool.filter(n => !n.used);
+      if (available.length === 0) {
+        alert('Đã hết biệt danh! Vui lòng liên hệ ban tổ chức.');
+        return;
+      }
+
+      const randomNickname = available[Math.floor(Math.random() * available.length)];
+      
+      const newParticipant = {
+        id: Date.now().toString(),
+        name: name,
+        nickname: randomNickname.text,
+        nicknameId: randomNickname.id,
+        timestamp: new Date().toISOString(),
+        hasWon: false
+      };
+
+      await database.ref('participants/' + newParticipant.id).set(newParticipant);
+      await database.ref('nicknamePool/' + randomNickname.id).update({ used: true });
+
+      showNicknamePopup(randomNickname.text);
+      input.value = '';
+    }
+
+    function handleAdminLogin() {
+      const input = document.getElementById('adminPassword');
+      if (input.value === ADMIN_PASSWORD) {
+        state.isAdminAuthenticated = true;
+        state.view = 'admin';
+        render();
+      } else {
+        alert('❌ Mật khẩu không đúng!');
+        input.value = '';
+      }
+    }
+
+    function handleLogout() {
+      state.isAdminAuthenticated = false;
+      state.view = 'home';
+      render();
+    }
+
+    async function addNicknames() {
+      const input = document.getElementById('nicknameInput');
+      const lines = input.value.split('\n').filter(line => line.trim());
+      
+      for (const line of lines) {
+        const id = Date.now().toString() + Math.random();
+        await database.ref('nicknamePool/' + id).set({
+          id: id,
+          text: line.trim(),
+          used: false
+        });
+      }
+      
+      input.value = '';
+    }
+
+    async function removeNickname(id) {
+      await database.ref('nicknamePool/' + id).remove();
+    }
+
+    function spinLuckyDraw() {
+      const eligible = state.participants.filter(p => !p.hasWon);
+      if (eligible.length === 0) {
+        alert('Tất cả mọi người đã được quay thưởng rồi!');
+        return;
+      }
+
+      state.isSpinning = true;
+      let count = 0;
+      
+      const interval = setInterval(async () => {
+        state.currentWinner = eligible[Math.floor(Math.random() * eligible.length)];
+        render();
+        count++;
+        
+        if (count > 30) {
+          clearInterval(interval);
+          state.isSpinning = false;
+          
+          const winner = eligible[Math.floor(Math.random() * eligible.length)];
+          state.currentWinner = winner;
+          
+          await database.ref('participants/' + winner.id).update({ hasWon: true });
+          await database.ref('drawnParticipants/' + winner.id).set({
+            ...winner,
+            wonAt: new Date().toISOString()
+          });
+          
+          render();
+        }
+      }, 100);
+    }
+
+    async function resetSystem() {
+      if (confirm('Bạn có chắc muốn reset toàn bộ hệ thống? Dữ liệu sẽ bị xóa!')) {
+        await database.ref('nicknamePool').remove();
+        await database.ref('participants').remove();
+        await database.ref('drawnParticipants').remove();
+        
+        state.nicknamePool = [];
+        state.participants = [];
+        state.drawnParticipants = [];
+        state.currentWinner = null;
+        
+        render();
+      }
+    }
+
+    function exportReport() {
+      const report = state.participants.map((p, i) => [
+        i + 1,
+        new Date(p.timestamp).toLocaleString('vi-VN'),
+        p.nickname,
+        p.name,
+        p.hasWon ? 'Co' : 'Chua'
+      ]);
+      
+      const csv = [
+        'STT,Thoi gian,Biet danh,Ten that,Da trung thuong',
+        ...report.map(row => row.join(','))
+      ].join('\n');
+      
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `year-end-party-${Date.now()}.csv`;
+      link.click();
+    }
+
+    function render() {
+      const app = document.getElementById('app');
+      
+      switch(state.view) {
+        case 'home':
+          app.innerHTML = renderHome();
+          break;
+        case 'checkin':
+          app.innerHTML = renderCheckin();
+          break;
+        case 'admin-login':
+          app.innerHTML = renderAdminLogin();
+          break;
+        case 'admin':
+          if (!state.isAdminAuthenticated) {
+            state.view = 'admin-login';
+            app.innerHTML = renderAdminLogin();
+          } else {
+            app.innerHTML = renderAdmin();
+          }
+          break;
+      }
+    }
+
+    // Initialize
+    initFirebaseListeners();
+    render();
+  </script>
 </body>
 </html>
