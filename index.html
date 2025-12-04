@@ -123,7 +123,7 @@
         <div class="min-h-screen bg-gradient-to-br from-green-500 via-teal-500 to-blue-500 p-8">
           <div class="max-w-2xl mx-auto">
             <div class="bg-white rounded-3xl shadow-2xl p-12 relative">
-              <button onclick="setView('home')" class="absolute top-6 left-6 text-gray-500 hover:text-gray-700 text-2xl">← Quay lại</button>
+              <button id="backBtn" class="absolute top-6 left-6 text-gray-500 hover:text-gray-700 text-2xl">← Quay lại</button>
               <div class="text-center mb-8 mt-8">
                 <div class="text-6xl mb-4">🎊</div>
                 <h1 class="text-4xl font-bold text-teal-600 mb-2">Chào mừng bạn!</h1>
@@ -132,10 +132,9 @@
               </div>
               <div class="mb-8">
                 <input type="text" id="inputName" placeholder="Nhập họ tên của bạn" 
-                  class="w-full px-6 py-5 text-xl border-4 border-teal-300 rounded-2xl focus:outline-none focus:border-teal-500 text-center font-semibold"
-                  onkeypress="if(event.key==='Enter') handleCheckin()">
+                  class="w-full px-6 py-5 text-xl border-4 border-teal-300 rounded-2xl focus:outline-none focus:border-teal-500 text-center font-semibold">
               </div>
-              <button onclick="handleCheckin()" 
+              <button id="checkinBtn"
                 class="w-full bg-gradient-to-r from-teal-500 to-blue-500 text-white py-6 rounded-2xl font-bold text-2xl hover:from-teal-600 hover:to-blue-600 transition-all shadow-lg">
                 ✨ Nhận biệt danh ngay!
               </button>
@@ -322,51 +321,72 @@
     }
 
     async function handleCheckin() {
+      console.log('=== BẮT ĐẦU CHECK-IN ===');
+      
       const input = document.getElementById('inputName');
       const name = input.value.trim();
+      
+      console.log('Tên nhập vào:', name);
       
       if (!name) {
         alert('Vui lòng nhập tên của bạn!');
         return;
       }
 
-      // FIXED: Kiểm tra data đã load chưa
-      if (!state.dataLoaded) {
+      // Kiểm tra data đã load chưa
+      console.log('Data loaded?', state.dataLoaded);
+      console.log('Nickname pool:', state.nicknamePool);
+      
+      if (!state.dataLoaded || state.nicknamePool.length === 0) {
         alert('Hệ thống đang tải dữ liệu, vui lòng đợi chút...');
         return;
       }
       
-      // FIXED: Filter chính xác các biệt danh chưa dùng
-      const available = state.nicknamePool.filter(n => n.used === false || n.used === undefined || !n.used);
+      // Filter chính xác các biệt danh chưa dùng
+      const available = state.nicknamePool.filter(n => !n.used);
       
-      console.log('Tổng biệt danh:', state.nicknamePool.length);
-      console.log('Biệt danh còn lại:', available.length);
-      console.log('Danh sách available:', available);
+      console.log('📊 Tổng biệt danh:', state.nicknamePool.length);
+      console.log('✅ Biệt danh còn lại:', available.length);
+      console.log('📝 Chi tiết available:', available);
       
       if (available.length === 0) {
-        alert('Đã hết biệt danh! Vui lòng liên hệ ban tổ chức.');
+        alert('❌ Đã hết biệt danh! Vui lòng liên hệ ban tổ chức.');
+        console.log('Tất cả biệt danh:', state.nicknamePool);
         return;
       }
 
       const random = available[Math.floor(Math.random() * available.length)];
+      console.log('🎲 Biệt danh được chọn:', random);
       
       try {
-        // Lưu participant trước
-        await db.ref('participants').push({
+        console.log('💾 Đang lưu participant...');
+        
+        // Lưu participant
+        const participantRef = await db.ref('participants').push({
           name: name,
           nickname: random.text,
           timestamp: new Date().toISOString(),
           hasWon: false
         });
+        
+        console.log('✅ Đã lưu participant:', participantRef.key);
 
         // Đánh dấu biệt danh đã dùng
+        console.log('🔒 Đánh dấu biệt danh đã dùng...');
         await db.ref('nicknamePool/' + random.id).update({ used: true });
+        console.log('✅ Đã đánh dấu used');
         
+        // Hiển thị popup
+        console.log('🎉 Hiển thị popup với biệt danh:', random.text);
         showNicknamePopup(random.text);
+        
         input.value = '';
+        console.log('=== HOÀN TẤT CHECK-IN ===');
       } catch (err) {
-        console.error('Lỗi check-in:', err);
-        alert('Có lỗi xảy ra! Vui lòng thử lại.');
+        console.error('❌ LỖI CHECK-IN:', err);
+        console.error('Chi tiết lỗi:', err.message);
+        console.error('Stack:', err.stack);
+        alert('Có lỗi xảy ra! Chi tiết: ' + err.message);
       }
     }
 
@@ -503,7 +523,19 @@
       
       switch(state.view) {
         case 'home': app.innerHTML = renderHome(); break;
-        case 'checkin': app.innerHTML = renderCheckin(); break;
+        case 'checkin': 
+          app.innerHTML = renderCheckin();
+          // Attach event listeners sau khi render
+          const backBtn = document.getElementById('backBtn');
+          const checkinBtn = document.getElementById('checkinBtn');
+          const inputName = document.getElementById('inputName');
+          
+          if (backBtn) backBtn.addEventListener('click', () => setView('home'));
+          if (checkinBtn) checkinBtn.addEventListener('click', handleCheckin);
+          if (inputName) inputName.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleCheckin();
+          });
+          break;
         case 'admin-login': app.innerHTML = renderAdminLogin(); break;
         case 'admin':
           if (!state.isAdminAuthenticated) {
