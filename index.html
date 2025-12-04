@@ -61,32 +61,46 @@
     const ADMIN_PASSWORD = 'yearend2024';
 
     // Firebase listeners
-    function initFirebaseListeners() {
-      database.ref('nicknamePool').on('value', (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          state.nicknamePool = Object.values(data);
-          if (state.view === 'admin') render();
-        }
-      });
+   database.ref('nicknamePool').on('value', (snapshot) => {
+  const data = snapshot.val();
+  if (data) {
+    // Chuyển từ object { key: {text, used} } → array có thêm id
+    state.nicknamePool = Object.keys(data).map(key => ({
+      id: key,
+      text: data[key].text || '',
+      used: data[key].used || false
+    }));
+  } else {
+    state.nicknamePool = [];
+  }
+  if (state.view === 'admin') render();
+});
 
-      database.ref('participants').on('value', (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          state.participants = Object.values(data);
-          if (state.view === 'admin') render();
-        }
-      });
+     database.ref('participants').on('value', (snapshot) => {
+  const data = snapshot.val();
+  if (data) {
+    state.participants = Object.keys(data).map(key => ({
+      id: key,
+      ...data[key]
+    }));
+  } else {
+    state.participants = [];
+  }
+  if (state.view === 'admin') render();
+});
 
-      database.ref('drawnParticipants').on('value', (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          state.drawnParticipants = Object.values(data);
-          if (state.view === 'admin') render();
-        }
-      });
-    }
-
+database.ref('drawnParticipants').on('value', (snapshot) => {
+  const data = snapshot.val();
+  if (data) {
+    state.drawnParticipants = Object.keys(data).map(key => ({
+      id: key,
+      ...data[key]
+    }));
+  } else {
+    state.drawnParticipants = [];
+  }
+  if (state.view === 'admin') render();
+});
     // Render functions
     function renderHome() {
       return `
