@@ -23,13 +23,21 @@ export default function YearEndPartySystem() {
   // Load data from storage
   useEffect(() => {
     loadData();
+    
+    // Tự động refresh mỗi 3 giây để cập nhật dữ liệu mới
+    const interval = setInterval(() => {
+      loadData();
+    }, 3000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const loadData = async () => {
     try {
-      const poolResult = await window.storage.get('nickname-pool');
-      const participantsResult = await window.storage.get('participants');
-      const drawnResult = await window.storage.get('drawn-participants');
+      // Dùng shared: true để dữ liệu được chia sẻ giữa tất cả người dùng
+      const poolResult = await window.storage.get('nickname-pool', true);
+      const participantsResult = await window.storage.get('participants', true);
+      const drawnResult = await window.storage.get('drawn-participants', true);
       
       if (poolResult) setNicknamePool(JSON.parse(poolResult.value));
       if (participantsResult) setParticipants(JSON.parse(participantsResult.value));
@@ -41,9 +49,10 @@ export default function YearEndPartySystem() {
 
   const saveData = async () => {
     try {
-      await window.storage.set('nickname-pool', JSON.stringify(nicknamePool));
-      await window.storage.set('participants', JSON.stringify(participants));
-      await window.storage.set('drawn-participants', JSON.stringify(drawnParticipants));
+      // Dùng shared: true để lưu dữ liệu chung cho mọi người
+      await window.storage.set('nickname-pool', JSON.stringify(nicknamePool), true);
+      await window.storage.set('participants', JSON.stringify(participants), true);
+      await window.storage.set('drawn-participants', JSON.stringify(drawnParticipants), true);
     } catch (error) {
       console.error('Save error:', error);
     }
@@ -146,9 +155,10 @@ export default function YearEndPartySystem() {
       setDrawnParticipants([]);
       setCurrentWinner(null);
       
-      window.storage.delete('nickname-pool').catch(() => {});
-      window.storage.delete('participants').catch(() => {});
-      window.storage.delete('drawn-participants').catch(() => {});
+      // Xóa dữ liệu shared
+      window.storage.delete('nickname-pool', true).catch(() => {});
+      window.storage.delete('participants', true).catch(() => {});
+      window.storage.delete('drawn-participants', true).catch(() => {});
     }
   };
 
