@@ -379,25 +379,25 @@
     }
 
     async function addNicknames() {
-      const input = document.getElementById('nicknameInput');
-      const lines = input.value.split('\n').filter(line => line.trim());
-      
-      for (const line of lines) {
-        const id = Date.now().toString() + Math.random();
-        await database.ref('nicknamePool/' + id).set({
-          id: id,
-          text: line.trim(),
-          used: false
-        });
-      }
-      
-      input.value = '';
-    }
+  const input = document.getElementById('nicknameInput');
+  const lines = input.value.split('\n').map(l => l.trim()).filter(Boolean);
 
-    async function removeNickname(id) {
-      await database.ref('nicknamePool/' + id).remove();
-    }
+  if (lines.length === 0) {
+    alert('Chưa nhập biệt danh nào!');
+    return;
+  }
 
+  for (const text of lines) {
+    // Cách tốt nhất: dùng push() để Firebase tự tạo key an toàn
+    await database.ref('nicknamePool').push({
+      text: text,
+      used: false
+    });
+  }
+
+  input.value = '';
+  alert(`Đã thêm thành công ${lines.length} biệt danh!`);
+}
     function spinLuckyDraw() {
       const eligible = state.participants.filter(p => !p.hasWon);
       if (eligible.length === 0) {
