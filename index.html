@@ -24,7 +24,15 @@
     // ===============================================
     // 🔥 FIREBASE CONFIG - THAY ĐỔI THÔNG TIN NÀY
     // ===============================================
-   const firebaseConfig = {
+  // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
   apiKey: "AIzaSyDdzEbdm4xnnqZ4jxekn_5s2A90fCuDZfk",
   authDomain: "year-end-party-d4dff.firebaseapp.com",
   projectId: "year-end-party-d4dff",
@@ -34,8 +42,7 @@
   measurementId: "G-CJM3MTSSC2"
 };
 
-
-   // Initialize Firebase
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 
