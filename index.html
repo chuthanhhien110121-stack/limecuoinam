@@ -4,41 +4,30 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Year End Party 2025</title>
-
-  <!-- Tailwind CDN chính thức (không còn cảnh báo) -->
-  <script src="https://cdn.tailwindcss.com?plugins=forms,typography,aspect-ratio,line-clamp"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          animation: { 'bounce-in': 'bounce-in 0.5s ease-out' },
-          keyframes: {
-            'bounce-in': {
-              '0%': { transform: 'scale(0.3)', opacity: '0' },
-              '50%': { transform: 'scale(1.05)' },
-              '70%': { transform: 'scale(0.9)' },
-              '100%': { transform: 'scale(1)', opacity: '1' }
-            }
-          }
-        }
-      }
-    }
-  </script>
-
-  <!-- Firebase compat v10 (mới nhất) -->
+  <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+  <style>
+    @keyframes bounce-in {
+      0% { transform: scale(0.3); opacity: 0; }
+      50% { transform: scale(1.05); }
+      70% { transform: scale(0.9); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .animate-bounce-in { animation: bounce-in 0.5s ease-out; }
+  </style>
 </head>
 <body class="m-0 p-0">
   <div id="app"></div>
 
   <script>
     // ===============================================
-    // FIREBASE CONFIG - ĐÃ SỬA HOÀN TOÀN
+    // FIREBASE CONFIG - ĐÃ SỬA: THÊM databaseURL
     // ===============================================
     const firebaseConfig = {
       apiKey: "AIzaSyDdzEbdm4xnnqZ4jxekn_5s2A90fCuDZfk",
       authDomain: "year-end-party-d4dff.firebaseapp.com",
+      databaseURL: "https://year-end-party-d4dff-default-rtdb.firebaseio.com",
       projectId: "year-end-party-d4dff",
       storageBucket: "year-end-party-d4dff.firebasestorage.app",
       messagingSenderId: "866293512188",
@@ -48,6 +37,7 @@
 
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
+    
     let state = {
       view: 'home',
       nicknamePool: [],
@@ -64,26 +54,44 @@
     function initFirebaseListeners() {
       database.ref('nicknamePool').on('value', (snapshot) => {
         const data = snapshot.val();
+        state.nicknamePool = [];
         if (data) {
-          state.nicknamePool = Object.values(data);
-          if (state.view === 'admin') render();
+          Object.keys(data).forEach(key => {
+            state.nicknamePool.push({
+              id: key,
+              ...data[key]
+            });
+          });
         }
+        if (state.view === 'admin') render();
       });
 
       database.ref('participants').on('value', (snapshot) => {
         const data = snapshot.val();
+        state.participants = [];
         if (data) {
-          state.participants = Object.values(data);
-          if (state.view === 'admin') render();
+          Object.keys(data).forEach(key => {
+            state.participants.push({
+              id: key,
+              ...data[key]
+            });
+          });
         }
+        if (state.view === 'admin') render();
       });
 
       database.ref('drawnParticipants').on('value', (snapshot) => {
         const data = snapshot.val();
+        state.drawnParticipants = [];
         if (data) {
-          state.drawnParticipants = Object.values(data);
-          if (state.view === 'admin') render();
+          Object.keys(data).forEach(key => {
+            state.drawnParticipants.push({
+              id: key,
+              ...data[key]
+            });
+          });
         }
+        if (state.view === 'admin') render();
       });
     }
 
@@ -173,7 +181,9 @@
                 class="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-6 rounded-2xl font-bold text-2xl hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg">
                 🔓 Đăng nhập
               </button>
-  
+              <div class="mt-6 text-center text-sm text-gray-500">
+                💡 Mật khẩu mặc định: yearend2024
+              </div>
             </div>
           </div>
         </div>
@@ -232,7 +242,7 @@
                       <span class="font-medium ${n.used ? 'line-through text-gray-500' : 'text-gray-800'}">${n.text}</span>
                       <div class="flex items-center gap-2">
                         ${n.used ? '<span class="text-xs bg-red-500 text-white px-2 py-1 rounded">Đã dùng</span>' : ''}
-                        <button onclick="removeNickname('${n.id}')" class="text-red-500 hover:bg-red-50 px-2 py-1 rounded text-sm">✕</button>
+                        <button onclick="removeNickname(\`${n.id}\`)" class="text-red-500 hover:bg-red-50 px-2 py-1 rounded text-sm">✕</button>
                       </div>
                     </div>
                   `).join('') || '<div class="text-center py-8 text-gray-400">Chưa có biệt danh nào. Thêm biệt danh để bắt đầu!</div>'}
@@ -334,7 +344,10 @@
       const input = document.getElementById('inputName');
       const name = input.value.trim();
       
-      if (!name) return;
+      if (!name) {
+        alert('Vui lòng nhập tên của bạn!');
+        return;
+      }
       
       const available = state.nicknamePool.filter(n => !n.used);
       if (available.length === 0) {
@@ -344,21 +357,24 @@
 
       const randomNickname = available[Math.floor(Math.random() * available.length)];
       
-      // Tạo participant mới bằng push() → key tự động an toàn
-const newRef = database.ref('participants').push();
-await newRef.set({
-  name: name,
-  nickname: randomNickname.text,
-  nicknameId: randomNickname.id,  // giữ lại để biết biệt danh nào đã dùng
-  timestamp: new Date().toISOString(),
-  hasWon: false
-});
+      try {
+        const newRef = database.ref('participants').push();
+        await newRef.set({
+          name: name,
+          nickname: randomNickname.text,
+          nicknameId: randomNickname.id,
+          timestamp: new Date().toISOString(),
+          hasWon: false
+        });
 
-// Đánh dấu biệt danh đã dùng
-await database.ref('nicknamePool/' + randomNickname.id).update({ used: true });
+        await database.ref('nicknamePool/' + randomNickname.id).update({ used: true });
 
-      showNicknamePopup(randomNickname.text);
-      input.value = '';
+        showNicknamePopup(randomNickname.text);
+        input.value = '';
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Có lỗi xảy ra! Vui lòng thử lại.');
+      }
     }
 
     function handleAdminLogin() {
@@ -380,24 +396,41 @@ await database.ref('nicknamePool/' + randomNickname.id).update({ used: true });
     }
 
     async function addNicknames() {
-  const input = document.getElementById('nicknameInput');
-  const lines = input.value.split('\n').map(l => l.trim()).filter(Boolean);
+      const input = document.getElementById('nicknameInput');
+      const lines = input.value.split('\n').map(l => l.trim()).filter(Boolean);
 
-  if (lines.length === 0) {
-    alert('Vui lòng nhập ít nhất 1 biệt danh!');
-    return;
-  }
+      if (lines.length === 0) {
+        alert('Vui lòng nhập ít nhất 1 biệt danh!');
+        return;
+      }
 
-  for (const text of lines) {
-    await database.ref('nicknamePool').push({
-      text: text,
-      used: false
-    });
-  }
+      try {
+        for (const text of lines) {
+          await database.ref('nicknamePool').push({
+            text: text,
+            used: false
+          });
+        }
 
-  input.value = '';
-  alert(`Đã thêm ${lines.length} biệt danh thành công!`);
-}
+        input.value = '';
+        alert(`✅ Đã thêm ${lines.length} biệt danh thành công!`);
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Có lỗi xảy ra! Vui lòng thử lại.');
+      }
+    }
+
+    async function removeNickname(id) {
+      if (confirm('Bạn có chắc muốn xóa biệt danh này?')) {
+        try {
+          await database.ref('nicknamePool/' + id).remove();
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Có lỗi xảy ra! Vui lòng thử lại.');
+        }
+      }
+    }
+
     function spinLuckyDraw() {
       const eligible = state.participants.filter(p => !p.hasWon);
       if (eligible.length === 0) {
@@ -420,29 +453,40 @@ await database.ref('nicknamePool/' + randomNickname.id).update({ used: true });
           const winner = eligible[Math.floor(Math.random() * eligible.length)];
           state.currentWinner = winner;
           
-          await database.ref('participants/' + winner.id).update({ hasWon: true });
-          await database.ref('drawnParticipants').push({
-  ...winner,
-  wonAt: new Date().toISOString()
-});
-          
-          render();
+          try {
+            await database.ref('participants/' + winner.id).update({ hasWon: true });
+            await database.ref('drawnParticipants').push({
+              ...winner,
+              wonAt: new Date().toISOString()
+            });
+            
+            render();
+          } catch (error) {
+            console.error('Error:', error);
+            alert('Có lỗi xảy ra khi lưu kết quả!');
+          }
         }
       }, 100);
     }
 
     async function resetSystem() {
       if (confirm('Bạn có chắc muốn reset toàn bộ hệ thống? Dữ liệu sẽ bị xóa!')) {
-        await database.ref('nicknamePool').remove();
-        await database.ref('participants').remove();
-        await database.ref('drawnParticipants').remove();
-        
-        state.nicknamePool = [];
-        state.participants = [];
-        state.drawnParticipants = [];
-        state.currentWinner = null;
-        
-        render();
+        try {
+          await database.ref('nicknamePool').remove();
+          await database.ref('participants').remove();
+          await database.ref('drawnParticipants').remove();
+          
+          state.nicknamePool = [];
+          state.participants = [];
+          state.drawnParticipants = [];
+          state.currentWinner = null;
+          
+          alert('✅ Đã reset hệ thống thành công!');
+          render();
+        } catch (error) {
+          console.error('Error:', error);
+          alert('Có lỗi xảy ra! Vui lòng thử lại.');
+        }
       }
     }
 
