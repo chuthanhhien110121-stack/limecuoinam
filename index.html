@@ -344,17 +344,18 @@
 
       const randomNickname = available[Math.floor(Math.random() * available.length)];
       
-      const newParticipant = {
-        id: Date.now().toString(),
-        name: name,
-        nickname: randomNickname.text,
-        nicknameId: randomNickname.id,
-        timestamp: new Date().toISOString(),
-        hasWon: false
-      };
+      // Tạo participant mới bằng push() → key tự động an toàn
+const newRef = database.ref('participants').push();
+await newRef.set({
+  name: name,
+  nickname: randomNickname.text,
+  nicknameId: randomNickname.id,  // giữ lại để biết biệt danh nào đã dùng
+  timestamp: new Date().toISOString(),
+  hasWon: false
+});
 
-      await database.ref('participants/' + newParticipant.id).set(newParticipant);
-      await database.ref('nicknamePool/' + randomNickname.id).update({ used: true });
+// Đánh dấu biệt danh đã dùng
+await database.ref('nicknamePool/' + randomNickname.id).update({ used: true });
 
       showNicknamePopup(randomNickname.text);
       input.value = '';
@@ -383,12 +384,11 @@
   const lines = input.value.split('\n').map(l => l.trim()).filter(Boolean);
 
   if (lines.length === 0) {
-    alert('Chưa nhập biệt danh nào!');
+    alert('Vui lòng nhập ít nhất 1 biệt danh!');
     return;
   }
 
   for (const text of lines) {
-    // Cách tốt nhất: dùng push() để Firebase tự tạo key an toàn
     await database.ref('nicknamePool').push({
       text: text,
       used: false
@@ -396,7 +396,7 @@
   }
 
   input.value = '';
-  alert(`Đã thêm thành công ${lines.length} biệt danh!`);
+  alert(`Đã thêm ${lines.length} biệt danh thành công!`);
 }
     function spinLuckyDraw() {
       const eligible = state.participants.filter(p => !p.hasWon);
@@ -421,10 +421,10 @@
           state.currentWinner = winner;
           
           await database.ref('participants/' + winner.id).update({ hasWon: true });
-          await database.ref('drawnParticipants/' + winner.id).set({
-            ...winner,
-            wonAt: new Date().toISOString()
-          });
+          await database.ref('drawnParticipants').push({
+  ...winner,
+  wonAt: new Date().toISOString()
+});
           
           render();
         }
