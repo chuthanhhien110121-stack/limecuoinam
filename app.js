@@ -1,0 +1,556 @@
+import React, { useState, useEffect } from 'react';
+import { Users, Gift, UserPlus, Award, Download, RefreshCw, Clock, Trophy, Settings } from 'lucide-react';
+
+export default function YearEndPartySystem() {
+  const [view, setView] = useState('home');
+  const [nicknamePool, setNicknamePool] = useState([]);
+  const [participants, setParticipants] = useState([]);
+  const [drawnParticipants, setDrawnParticipants] = useState([]);
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [currentWinner, setCurrentWinner] = useState(null);
+  const [showNicknamePopup, setShowNicknamePopup] = useState(false);
+  const [assignedNickname, setAssignedNickname] = useState('');
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  
+  const [inputName, setInputName] = useState('');
+  const [adminNicknameInput, setAdminNicknameInput] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  
+  const ADMIN_PASSWORD = 'yearend2024';
+
+  const loadData = async () => {
+    try {
+      const poolResult = await window.storage.get('nickname-pool', true);
+      const participantsResult = await window.storage.get('participants', true);
+      const drawnResult = await window.storage.get('drawn-participants', true);
+      
+      if (poolResult) setNicknamePool(JSON.parse(poolResult.value));
+      if (participantsResult) setParticipants(JSON.parse(participantsResult.value));
+      if (drawnResult) setDrawnParticipants(JSON.parse(drawnResult.value));
+    } catch (error) {
+      console.log('Loading data...');
+    }
+  };
+
+  const saveData = async () => {
+    try {
+      await window.storage.set('nickname-pool', JSON.stringify(nicknamePool), true);
+      await window.storage.set('participants', JSON.stringify(participants), true);
+      await window.storage.set('drawn-participants', JSON.stringify(drawnParticipants), true);
+    } catch (error) {
+      console.error('Save error:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    saveData();
+  }, [nicknamePool, participants, drawnParticipants]);
+
+  const addNicknamesToPool = () => {
+    const lines = adminNicknameInput.split('\n').filter(line => line.trim());
+    const newNicknames = lines.map(line => ({
+      id: Date.now() + Math.random(),
+      text: line.trim(),
+      used: false
+    }));
+    setNicknamePool([...nicknamePool, ...newNicknames]);
+    setAdminNicknameInput('');
+  };
+
+  const removeNicknameFromPool = (id) => {
+    setNicknamePool(nicknamePool.filter(n => n.id !== id));
+  };
+
+  const handleCheckin = () => {
+    if (!inputName.trim()) return;
+    
+    const availableNicknames = nicknamePool.filter(n => !n.used);
+    if (availableNicknames.length === 0) {
+      alert('Đã hết biệt danh! Vui lòng liên hệ ban tổ chức.');
+      return;
+    }
+
+    const randomIndex = Math.floor(Math.random() * availableNicknames.length);
+    const selectedNickname = availableNicknames[randomIndex];
+
+    const newParticipant = {
+      id: Date.now(),
+      name: inputName.trim(),
+      nickname: selectedNickname.text,
+      nicknameId: selectedNickname.id,
+      timestamp: new Date().toISOString(),
+      hasWon: false
+    };
+
+    setParticipants([...participants, newParticipant]);
+    setNicknamePool(nicknamePool.map(n => 
+      n.id === selectedNickname.id ? {...n, used: true} : n
+    ));
+    
+    setAssignedNickname(selectedNickname.text);
+    setShowNicknamePopup(true);
+    setInputName('');
+  };
+
+  const closeNicknamePopup = () => {
+    setShowNicknamePopup(false);
+    setAssignedNickname('');
+  };
+
+  const spinLuckyDraw = () => {
+    const eligibleParticipants = participants.filter(p => !p.hasWon);
+    
+    if (eligibleParticipants.length === 0) {
+      alert('Tất cả mọi người đã được quay thưởng rồi!');
+      return;
+    }
+
+    setIsSpinning(true);
+    let spinCount = 0;
+    
+    const spinInterval = setInterval(() => {
+      const randomIndex = Math.floor(Math.random() * eligibleParticipants.length);
+      setCurrentWinner(eligibleParticipants[randomIndex]);
+      spinCount++;
+      
+      if (spinCount > 30) {
+        clearInterval(spinInterval);
+        setIsSpinning(false);
+        
+        const finalWinner = eligibleParticipants[Math.floor(Math.random() * eligibleParticipants.length)];
+        setCurrentWinner(finalWinner);
+        
+        setParticipants(participants.map(p => 
+          p.id === finalWinner.id ? {...p, hasWon: true} : p
+        ));
+        setDrawnParticipants([...drawnParticipants, {...finalWinner, wonAt: new Date().toISOString()}]);
+      }
+    }, 100);
+  };
+
+  const resetSystem = () => {
+    if (window.confirm('Bạn có chắc muốn reset toàn bộ hệ thống? Dữ liệu sẽ bị xóa!')) {
+      setNicknamePool([]);
+      setParticipants([]);
+      setDrawnParticipants([]);
+      setCurrentWinner(null);
+      
+      window.storage.delete('nickname-pool', true).catch(() => {});
+      window.storage.delete('participants', true).catch(() => {});
+      window.storage.delete('drawn-participants', true).catch(() => {});
+    }
+  };
+
+  const exportReport = () => {
+    const report = participants.map((p, index) => ({
+      'STT': index + 1,
+      'Thoi gian': new Date(p.timestamp).toLocaleString('vi-VN'),
+      'Biet danh': p.nickname,
+      'Ten that': p.name,
+      'Da trung thuong': p.hasWon ? 'Co' : 'Chua'
+    }));
+    
+    const csv = [
+      Object.keys(report[0]).join(','),
+      ...report.map(row => Object.values(row).join(','))
+    ].join('\n');
+    
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `year-end-party-report-${Date.now()}.csv`;
+    link.click();
+  };
+
+  if (view === 'home') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 p-8 flex items-center justify-center">
+        <div className="max-w-4xl w-full">
+          <div className="text-center mb-12">
+            <div className="text-8xl mb-6">🎉</div>
+            <h1 className="text-6xl font-bold text-white mb-4 drop-shadow-lg">Year End Party 2024</h1>
+            <p className="text-2xl text-white opacity-90">Chào mừng đến với bữa tiệc cuối năm!</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            <button
+              onClick={() => setView('checkin')}
+              className="bg-white rounded-3xl p-12 shadow-2xl hover:shadow-3xl transition-all transform hover:scale-105 group"
+            >
+              <div className="text-7xl mb-6 group-hover:scale-110 transition-transform">🎊</div>
+              <h2 className="text-3xl font-bold text-teal-600 mb-3">Check-in</h2>
+              <p className="text-gray-600 text-lg">Nhập tên để nhận biệt danh của bạn</p>
+              <div className="mt-6 bg-teal-100 text-teal-700 px-6 py-3 rounded-xl font-semibold">
+                Dành cho khách mời →
+              </div>
+            </button>
+
+            <button
+              onClick={() => setView('admin-login')}
+              className="bg-white rounded-3xl p-12 shadow-2xl hover:shadow-3xl transition-all transform hover:scale-105 group"
+            >
+              <div className="text-7xl mb-6 group-hover:scale-110 transition-transform">👑</div>
+              <h2 className="text-3xl font-bold text-purple-600 mb-3">Admin</h2>
+              <p className="text-gray-600 text-lg">Quản lý & quay số trúng thưởng</p>
+              <div className="mt-6 bg-purple-100 text-purple-700 px-6 py-3 rounded-xl font-semibold flex items-center justify-center gap-2">
+                🔒 Dành cho BTC →
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'checkin') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-500 via-teal-500 to-blue-500 p-8">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-white rounded-3xl shadow-2xl p-12 relative">
+            <button
+              onClick={() => setView('home')}
+              className="absolute top-6 left-6 text-gray-500 hover:text-gray-700 text-2xl"
+            >
+              ← Quay lại
+            </button>
+
+            <div className="text-center mb-8 mt-8">
+              <div className="text-6xl mb-4">🎊</div>
+              <h1 className="text-4xl font-bold text-teal-600 mb-2">Chào mừng bạn!</h1>
+              <p className="text-gray-600 text-lg">Nhập tên để nhận biệt danh bí ẩn</p>
+            </div>
+
+            <div className="mb-8">
+              <input
+                type="text"
+                value={inputName}
+                onChange={(e) => setInputName(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleCheckin()}
+                placeholder="Nhập họ tên của bạn"
+                className="w-full px-6 py-5 text-xl border-4 border-teal-300 rounded-2xl focus:outline-none focus:border-teal-500 text-center font-semibold"
+              />
+            </div>
+
+            <button
+              onClick={handleCheckin}
+              disabled={!inputName.trim()}
+              className="w-full bg-gradient-to-r from-teal-500 to-blue-500 text-white py-6 rounded-2xl font-bold text-2xl hover:from-teal-600 hover:to-blue-600 transition-all shadow-lg flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <UserPlus size={28} />
+              Nhận biệt danh ngay!
+            </button>
+
+            <div className="mt-8 text-center text-gray-500">
+              <p className="text-sm">💡 Hãy nhớ biệt danh của bạn để tham gia các hoạt động!</p>
+            </div>
+          </div>
+
+          {showNicknamePopup && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-3xl p-12 max-w-lg w-full text-center shadow-2xl">
+                <div className="text-7xl mb-6">🎭</div>
+                <h2 className="text-3xl font-bold text-purple-600 mb-4">Biệt danh của bạn là:</h2>
+                <div className="bg-gradient-to-r from-yellow-100 to-orange-100 rounded-2xl p-8 mb-6 border-4 border-yellow-300">
+                  <p className="text-5xl font-bold text-orange-600">"{assignedNickname}"</p>
+                </div>
+                <p className="text-xl text-gray-700 mb-8">📌 Hãy ghi nhớ biệt danh này nhé!</p>
+                <button
+                  onClick={closeNicknamePopup}
+                  className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-10 py-4 rounded-xl font-bold text-xl hover:from-green-600 hover:to-emerald-600 transition-all"
+                >
+                  Đã nhớ rồi! ✓
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'admin-login') {
+    const handleAdminLogin = () => {
+      if (adminPassword === ADMIN_PASSWORD) {
+        setIsAdminAuthenticated(true);
+        setView('admin');
+        setAdminPassword('');
+      } else {
+        alert('❌ Mật khẩu không đúng!');
+        setAdminPassword('');
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-500 p-8 flex items-center justify-center">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-3xl shadow-2xl p-12 relative">
+            <button
+              onClick={() => setView('home')}
+              className="absolute top-6 left-6 text-gray-500 hover:text-gray-700 text-2xl"
+            >
+              ← Quay lại
+            </button>
+
+            <div className="text-center mb-8 mt-8">
+              <div className="text-7xl mb-4">🔒</div>
+              <h1 className="text-4xl font-bold text-purple-600 mb-2">Đăng nhập Admin</h1>
+              <p className="text-gray-600 text-lg">Chỉ dành cho Ban Tổ Chức</p>
+            </div>
+
+            <div className="mb-8">
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
+                placeholder="Nhập mật khẩu"
+                className="w-full px-6 py-5 text-xl border-4 border-purple-300 rounded-2xl focus:outline-none focus:border-purple-500 text-center font-semibold"
+              />
+            </div>
+
+            <button
+              onClick={handleAdminLogin}
+              disabled={!adminPassword.trim()}
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-6 rounded-2xl font-bold text-2xl hover:from-purple-600 hover:to-pink-600 transition-all shadow-lg flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              🔓 Đăng nhập
+            </button>
+
+            <div className="mt-6 text-center text-sm text-gray-500">
+              💡 Mật khẩu mặc định: yearend2024
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'admin') {
+    if (!isAdminAuthenticated) {
+      setView('admin-login');
+      return null;
+    }
+
+    const sortedParticipants = [...participants].sort((a, b) => 
+      new Date(a.timestamp) - new Date(b.timestamp)
+    );
+    const eligibleCount = participants.filter(p => !p.hasWon).length;
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-600 to-red-500 p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-white rounded-3xl shadow-2xl p-8">
+            <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setView('home')}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ← Quay lại
+                </button>
+                <div>
+                  <h1 className="text-4xl font-bold text-purple-600 mb-1">👑 Trang Quản Trị</h1>
+                  <p className="text-gray-600">Quản lý biệt danh & quay thưởng</p>
+                </div>
+              </div>
+              <div className="flex gap-3 flex-wrap">
+                <button
+                  onClick={exportReport}
+                  className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-all flex items-center gap-2"
+                >
+                  <Download size={20} />
+                  Xuất báo cáo
+                </button>
+                <button
+                  onClick={resetSystem}
+                  className="bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 transition-all flex items-center gap-2"
+                >
+                  <RefreshCw size={20} />
+                  Reset
+                </button>
+                <button
+                  onClick={() => {
+                    setIsAdminAuthenticated(false);
+                    setView('home');
+                  }}
+                  className="bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition-all flex items-center gap-2"
+                >
+                  🔒 Đăng xuất
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-blue-100 to-indigo-100 rounded-2xl p-6 mb-8">
+              <h2 className="text-2xl font-bold text-indigo-700 mb-4 flex items-center gap-2">
+                <Settings size={28} />
+                Quản lý Kho Biệt Danh
+              </h2>
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-white rounded-xl p-4 text-center">
+                  <div className="text-4xl font-bold text-indigo-600">{nicknamePool.length}</div>
+                  <div className="text-sm text-gray-600 mt-1">Tổng cộng</div>
+                </div>
+                <div className="bg-white rounded-xl p-4 text-center">
+                  <div className="text-4xl font-bold text-green-600">{nicknamePool.filter(n => !n.used).length}</div>
+                  <div className="text-sm text-gray-600 mt-1">Còn lại</div>
+                </div>
+                <div className="bg-white rounded-xl p-4 text-center">
+                  <div className="text-4xl font-bold text-gray-600">{nicknamePool.filter(n => n.used).length}</div>
+                  <div className="text-sm text-gray-600 mt-1">Đã dùng</div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl p-4 mb-4">
+                <textarea
+                  value={adminNicknameInput}
+                  onChange={(e) => setAdminNicknameInput(e.target.value)}
+                  placeholder="Nhập danh sách biệt danh (mỗi dòng 1 biệt danh)&#10;Ví dụ:&#10;Siêu nhân Marketing&#10;Flash của phòng IT&#10;Cà phê đen"
+                  className="w-full h-32 px-4 py-3 border-2 border-indigo-300 rounded-lg focus:outline-none focus:border-indigo-500"
+                />
+                <button
+                  onClick={addNicknamesToPool}
+                  disabled={!adminNicknameInput.trim()}
+                  className="w-full mt-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white py-3 rounded-lg hover:from-indigo-600 hover:to-purple-600 transition-all font-bold disabled:opacity-50"
+                >
+                  ➕ Thêm vào kho
+                </button>
+              </div>
+
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {nicknamePool.map((n) => (
+                  <div key={n.id} className={`rounded-lg p-3 flex justify-between items-center ${n.used ? 'bg-gray-100 opacity-60' : 'bg-white'}`}>
+                    <span className={`font-medium ${n.used ? 'line-through text-gray-500' : 'text-gray-800'}`}>
+                      {n.text}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {n.used && <span className="text-xs bg-red-500 text-white px-2 py-1 rounded">Đã dùng</span>}
+                      <button
+                        onClick={() => removeNicknameFromPool(n.id)}
+                        className="text-red-500 hover:bg-red-50 px-2 py-1 rounded text-sm"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {nicknamePool.length === 0 && (
+                  <div className="text-center py-8 text-gray-400">
+                    Chưa có biệt danh nào. Thêm biệt danh để bắt đầu!
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-yellow-100 to-orange-100 rounded-2xl p-8 mb-8 border-4 border-yellow-300">
+              <h2 className="text-3xl font-bold text-orange-600 mb-6 text-center flex items-center justify-center gap-3">
+                <Trophy size={32} />
+                Quay Số Trúng Thưởng
+              </h2>
+              
+              <div className="text-center mb-6">
+                <p className="text-xl text-gray-700">
+                  Còn <span className="font-bold text-orange-600">{eligibleCount}</span> người chưa quay
+                </p>
+              </div>
+
+              {currentWinner && (
+                <div className="bg-white rounded-xl p-8 mb-6 text-center border-4 border-yellow-400">
+                  <div className="text-6xl mb-4">🎉</div>
+                  <h3 className="text-2xl text-gray-600 mb-2">Biệt danh: "{currentWinner.nickname}"</h3>
+                  <h3 className="text-4xl font-bold text-purple-600 mb-2">{currentWinner.name}</h3>
+                  {!isSpinning && (
+                    <div className="mt-4">
+                      <span className="bg-green-500 text-white px-6 py-2 rounded-full font-bold text-lg">
+                        🎊 Chúc mừng! 🎊
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button
+                onClick={spinLuckyDraw}
+                disabled={isSpinning || eligibleCount === 0}
+                className="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-6 rounded-xl font-bold text-2xl hover:from-orange-600 hover:to-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+              >
+                <Gift size={32} />
+                {isSpinning ? 'Đang quay...' : 'Quay thưởng ngay!'}
+              </button>
+            </div>
+
+            {drawnParticipants.length > 0 && (
+              <div className="bg-gradient-to-r from-green-100 to-emerald-100 rounded-xl p-6 mb-6">
+                <h3 className="text-xl font-bold text-green-700 mb-4 flex items-center gap-2">
+                  <Award size={24} />
+                  Danh sách người trúng thưởng ({drawnParticipants.length})
+                </h3>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {drawnParticipants.map((p, index) => (
+                    <div key={p.id} className="bg-white rounded-lg p-4 flex justify-between items-center">
+                      <div>
+                        <span className="font-bold text-green-600">#{index + 1}</span>
+                        <span className="ml-3 text-purple-600">"{p.nickname}"</span>
+                        <span className="mx-2 text-gray-400">→</span>
+                        <span className="font-semibold text-gray-800">{p.name}</span>
+                      </div>
+                      <span className="text-sm text-gray-500">
+                        {new Date(p.wonAt).toLocaleTimeString('vi-VN')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-gray-50 rounded-xl p-6">
+              <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <Clock size={24} />
+                Thống kê Check-in theo thời gian ({participants.length} người)
+              </h3>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {sortedParticipants.map((p, index) => (
+                  <div key={p.id} className={`rounded-lg p-4 flex justify-between items-center ${p.hasWon ? 'bg-green-50 border-2 border-green-300' : 'bg-white'}`}>
+                    <div className="flex items-center gap-4 flex-1">
+                      <span className="font-bold text-gray-500 w-10">#{index + 1}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-gray-500 flex items-center gap-1">
+                            <Clock size={14} />
+                            {new Date(p.timestamp).toLocaleTimeString('vi-VN')}
+                          </span>
+                        </div>
+                        <div className="mt-1">
+                          <span className="text-purple-600 font-medium">"{p.nickname}"</span>
+                          <span className="mx-2 text-gray-400">→</span>
+                          <span className="font-semibold text-gray-800">{p.name}</span>
+                        </div>
+                      </div>
+                    </div>
+                    {p.hasWon && (
+                      <span className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-bold ml-4">
+                        ✓ Đã trúng
+                      </span>
+                    )}
+                  </div>
+                ))}
+                {participants.length === 0 && (
+                  <div className="text-center py-8 text-gray-400">
+                    Chưa có ai check-in
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
