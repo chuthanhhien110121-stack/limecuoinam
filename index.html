@@ -21,6 +21,7 @@
   <div id="app"></div>
 
   <script>
+    // THAY ĐỔI URL NÀY NẾU CẦN (xem hướng dẫn bên dưới)
     const firebaseConfig = {
       apiKey: "AIzaSyDdzEbdm4xnnqZ4jxekn_5s2A90fCuDZfk",
       authDomain: "year-end-party-d4dff.firebaseapp.com",
@@ -31,8 +32,16 @@
       appId: "1:866293512188:web:65754bd03de5910021e479"
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+    let app, db;
+    
+    try {
+      app = firebase.initializeApp(firebaseConfig);
+      db = firebase.database();
+      console.log('✅ Firebase connected successfully!');
+    } catch (error) {
+      console.error('❌ Firebase connection error:', error);
+      alert('Lỗi kết nối Firebase! Kiểm tra console.');
+    }
     
     let state = {
       view: 'home',
@@ -46,36 +55,46 @@
 
     const ADMIN_PASSWORD = 'yearend2024';
 
-    // Firebase listeners
-    db.ref('nicknamePool').on('value', (snap) => {
-      state.nicknamePool = [];
-      if (snap.exists()) {
-        snap.forEach(child => {
-          state.nicknamePool.push({ id: child.key, ...child.val() });
-        });
-      }
-      if (state.view === 'admin') render();
-    });
+    // Firebase listeners với error handling
+    function initFirebaseListeners() {
+      db.ref('nicknamePool').on('value', (snap) => {
+        state.nicknamePool = [];
+        if (snap.exists()) {
+          snap.forEach(child => {
+            state.nicknamePool.push({ id: child.key, ...child.val() });
+          });
+          console.log('📦 Loaded nicknames:', state.nicknamePool.length);
+        }
+        if (state.view === 'admin') render();
+      }, (error) => {
+        console.error('❌ Error loading nicknames:', error);
+      });
 
-    db.ref('participants').on('value', (snap) => {
-      state.participants = [];
-      if (snap.exists()) {
-        snap.forEach(child => {
-          state.participants.push({ id: child.key, ...child.val() });
-        });
-      }
-      if (state.view === 'admin') render();
-    });
+      db.ref('participants').on('value', (snap) => {
+        state.participants = [];
+        if (snap.exists()) {
+          snap.forEach(child => {
+            state.participants.push({ id: child.key, ...child.val() });
+          });
+          console.log('👥 Loaded participants:', state.participants.length);
+        }
+        if (state.view === 'admin') render();
+      }, (error) => {
+        console.error('❌ Error loading participants:', error);
+      });
 
-    db.ref('drawnParticipants').on('value', (snap) => {
-      state.drawnParticipants = [];
-      if (snap.exists()) {
-        snap.forEach(child => {
-          state.drawnParticipants.push({ id: child.key, ...child.val() });
-        });
-      }
-      if (state.view === 'admin') render();
-    });
+      db.ref('drawnParticipants').on('value', (snap) => {
+        state.drawnParticipants = [];
+        if (snap.exists()) {
+          snap.forEach(child => {
+            state.drawnParticipants.push({ id: child.key, ...child.val() });
+          });
+        }
+        if (state.view === 'admin') render();
+      }, (error) => {
+        console.error('❌ Error loading winners:', error);
+      });
+    }
 
     function renderHome() {
       return `
@@ -127,6 +146,7 @@
               </button>
               <div class="mt-8 text-center text-gray-500">
                 <p class="text-sm">💡 Hãy nhớ biệt danh của bạn để tham gia các hoạt động!</p>
+                <p class="text-xs mt-2 text-gray-400">Debug: ${state.nicknamePool.filter(n => !n.used).length} biệt danh còn lại</p>
               </div>
             </div>
           </div>
@@ -316,13 +336,20 @@
         return;
       }
       
+      console.log('🔍 Checking available nicknames...');
+      console.log('Total pool:', state.nicknamePool.length);
+      console.log('Pool:', state.nicknamePool);
+      
       const available = state.nicknamePool.filter(n => !n.used);
+      console.log('Available:', available.length, available);
+      
       if (available.length === 0) {
         alert('Đã hết biệt danh! Vui lòng liên hệ ban tổ chức.');
         return;
       }
 
       const random = available[Math.floor(Math.random() * available.length)];
+      console.log('Selected:', random);
       
       try {
         await db.ref('participants').push({
@@ -333,11 +360,13 @@
         });
 
         await db.ref('nicknamePool/' + random.id).update({ used: true });
+        console.log('✅ Check-in success!');
+        
         showNicknamePopup(random.text);
         input.value = '';
       } catch (err) {
-        console.error(err);
-        alert('Có lỗi xảy ra! Vui lòng thử lại.');
+        console.error('❌ Check-in error:', err);
+        alert('Có lỗi xảy ra! Vui lòng thử lại. Chi tiết: ' + err.message);
       }
     }
 
@@ -361,22 +390,28 @@
 
     async function addNicknames() {
       const input = document.getElementById('nicknameInput');
-      const lines = input.value.split('\n').map(l => l.trim()).filter(Boolean);
-
-      if (lines.length === 0) {
+      const text = input.value.trim();
+      
+      if (!text) {
         alert('Vui lòng nhập ít nhất 1 biệt danh!');
         return;
       }
 
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      console.log('Adding nicknames:', lines);
+
       try {
-        for (const text of lines) {
-          await db.ref('nicknamePool').push({ text: text, used: false });
+        for (const line of lines) {
+          await db.ref('nicknamePool').push({ 
+            text: line, 
+            used: false 
+          });
         }
         input.value = '';
         alert(`✅ Đã thêm ${lines.length} biệt danh!`);
       } catch (err) {
-        console.error(err);
-        alert('Có lỗi! Vui lòng thử lại.');
+        console.error('❌ Add error:', err);
+        alert('Có lỗi! Chi tiết: ' + err.message);
       }
     }
 
@@ -385,8 +420,8 @@
         try {
           await db.ref('nicknamePool/' + id).remove();
         } catch (err) {
-          console.error(err);
-          alert('Có lỗi! Vui lòng thử lại.');
+          console.error('❌ Remove error:', err);
+          alert('Có lỗi! Chi tiết: ' + err.message);
         }
       }
     }
@@ -418,7 +453,7 @@
             await db.ref('drawnParticipants').push({ ...winner, wonAt: new Date().toISOString() });
             render();
           } catch (err) {
-            console.error(err);
+            console.error('❌ Draw error:', err);
             alert('Lỗi lưu kết quả!');
           }
         }
@@ -434,8 +469,8 @@
           alert('✅ Đã reset!');
           render();
         } catch (err) {
-          console.error(err);
-          alert('Có lỗi!');
+          console.error('❌ Reset error:', err);
+          alert('Có lỗi! Chi tiết: ' + err.message);
         }
       }
     }
@@ -443,41 +478,4 @@
     function exportReport() {
       const csv = [
         'STT,Thoi gian,Biet danh,Ten that,Da trung thuong',
-        ...state.participants.map((p, i) => [
-          i + 1,
-          new Date(p.timestamp).toLocaleString('vi-VN'),
-          p.nickname,
-          p.name,
-          p.hasWon ? 'Co' : 'Chua'
-        ].join(','))
-      ].join('\n');
-      
-      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `year-end-party-${Date.now()}.csv`;
-      link.click();
-    }
-
-    function render() {
-      const app = document.getElementById('app');
-      
-      switch(state.view) {
-        case 'home': app.innerHTML = renderHome(); break;
-        case 'checkin': app.innerHTML = renderCheckin(); break;
-        case 'admin-login': app.innerHTML = renderAdminLogin(); break;
-        case 'admin':
-          if (!state.isAdminAuthenticated) {
-            state.view = 'admin-login';
-            app.innerHTML = renderAdminLogin();
-          } else {
-            app.innerHTML = renderAdmin();
-          }
-          break;
-      }
-    }
-
-    render();
-  </script>
-</body>
-</html>
+        ...state.
