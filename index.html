@@ -478,4 +478,45 @@
     function exportReport() {
       const csv = [
         'STT,Thoi gian,Biet danh,Ten that,Da trung thuong',
-        ...state.
+        ...state.participants.map((p, i) => [
+          i + 1,
+          new Date(p.timestamp).toLocaleString('vi-VN'),
+          p.nickname,
+          p.name,
+          p.hasWon ? 'Co' : 'Chua'
+        ].join(','))
+      ].join('\n');
+      
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `year-end-party-${Date.now()}.csv`;
+      link.click();
+    }
+
+    function render() {
+      const app = document.getElementById('app');
+      
+      switch(state.view) {
+        case 'home': app.innerHTML = renderHome(); break;
+        case 'checkin': app.innerHTML = renderCheckin(); break;
+        case 'admin-login': app.innerHTML = renderAdminLogin(); break;
+        case 'admin':
+          if (!state.isAdminAuthenticated) {
+            state.view = 'admin-login';
+            app.innerHTML = renderAdminLogin();
+          } else {
+            app.innerHTML = renderAdmin();
+          }
+          break;
+      }
+    }
+
+    // Initialize
+    initFirebaseListeners();
+    render();
+    
+    console.log('🚀 App initialized!');
+  </script>
+</body>
+</html>
