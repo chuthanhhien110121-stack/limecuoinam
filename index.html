@@ -243,13 +243,13 @@
                   <p class="text-xl text-gray-700">Còn <span class="font-bold text-orange-600">${eligible}</span> người chưa quay</p>
                 </div>
                 ${state.currentWinner ? `
-                  <div class="bg-white rounded-xl p-8 mb-6 text-center border-4 border-yellow-400">
-                    <div class="text-6xl mb-4">🎉</div>
-                    <h3 class="text-2xl text-gray-600 mb-2">Biệt danh: "${state.currentWinner.nickname}"</h3>
-                    <h3 class="text-4xl font-bold text-purple-600 mb-2">${state.currentWinner.name}</h3>
-                    ${!state.isSpinning ? '<div class="mt-4"><span class="bg-green-500 text-white px-6 py-2 rounded-full font-bold text-lg">🎊 Chúc mừng! 🎊</span></div>' : ''}
-                  </div>
-                ` : ''}
+  <div class="bg-white rounded-xl p-8 mb-6 text-center border-4 border-yellow-400">
+    <div class="text-6xl mb-4">🎉</div>
+    <h3 class="text-2xl text-gray-600 mb-2">Người trúng thưởng:</h3>
+    <h3 class="text-5xl font-bold text-purple-600 mb-2">"${state.currentWinner.nickname}"</h3>
+    ${!state.isSpinning ? '<div class="mt-4"><span class="bg-green-500 text-white px-6 py-2 rounded-full font-bold text-lg">🎊 Chúc mừng! 🎊</span></div>' : ''}
+  </div>
+` : ''}
                 <button onclick="spinLuckyDraw()" ${eligible === 0 ? 'disabled' : ''}
                   class="w-full bg-gradient-to-r from-orange-500 to-red-500 text-white py-6 rounded-xl font-bold text-2xl hover:from-orange-600 hover:to-red-600 transition-all disabled:opacity-50">
                   🎁 ${state.isSpinning ? 'Đang quay...' : 'Quay thưởng ngay!'}
